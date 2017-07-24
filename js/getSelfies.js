@@ -5,6 +5,8 @@
 var userName;       //Stores the facebook user name to send together with the pictures in JSON
 var jObject = {};   //we send this JSON to SAP Leonardo (face recognition)
 var line;           //Controls HTML to display pictures in a line
+var phoroURLs = [];      //stores URLs for all photoIDs
+var photoIDs = [];       //stores IDs for all photoIDs
 
 window.fbAsyncInit = function() {
 //This function is required to initiate the Facebook SDK
@@ -101,6 +103,60 @@ function getPhotoURL(photoID){
     );
 }
 
+function getPhotoURLBatch(photoID){
+// This function returns array of Picture URLs
+// given the Picture IDs (array of photoID) in batch mode
+    var eachElement;
+    var data;
+
+    var oCompleteCall = {};
+    oCompleteCall.batch = [];
+
+    for(var i = 0; i < photoID.length ; i++){
+        var oMethodAndURL = {};
+        oMethodAndURL.method = 'GET';
+    
+        oMethodAndURL.relative_url = photoID[i];
+        oCompleteCall.batch.push(oMethodAndURL);
+    }
+    //console.dir(oCompleteCall.batch);
+    
+
+    FB.api('/', 'POST', {
+    batch: JSON.stringify(oCompleteCall.batch),
+    include_headers: false
+    }, function (response) {
+        for(var i = 0; i < response.length ; i++){
+            
+            /////////////////////////////??
+            eachElement = response[i];
+            for (var property in eachElement) {
+                if (eachElement.hasOwnProperty(property)) {
+                    data = eachElement[property];
+                }
+            }
+            
+            eachElement = JSON.parse(data);
+            
+            /////////////////////////////??
+        
+        
+            //console.log(response);
+            //Format the HTML to display retrieved pictures in index.html
+            line = "<td><img src=" + JSON.stringify(eachElement.source)  + "height=140 width=140></td>";
+            $('#resultTable').append(line);
+            
+            //Builds JSON object
+            //Get the source element which is the URL
+            //photoURL = JSON.stringify(imgResult.source).replace(/['"]+/g, '');
+            //Clean URL to avoid special char at the begining and at the end of the string
+            //photoURL = photoURL.replace(/['"]+/g, '');
+            jObject.URL.push(JSON.stringify(eachElement.source).replace(/['"]+/g, ''));
+            jObject.Name = userName;
+        }
+    });
+}
+
 function displayUploadedPictures(result){
 // Function to display pictures user has uploaded or is tagged in HTML
 	var json;
@@ -113,8 +169,15 @@ function displayUploadedPictures(result){
 		
  		var photoID = '/' + JSON.stringify(json.id)+ '?fields=source';
  		photoID = photoID.replace(/['"]+/g, '');
- 		getPhotoURL(photoID);
+ 		photoIDs.push(photoID);
+ 	//	getPhotoURL(photoID);
 	}
+	
+// 	for (i=0; photoIDs.length, i++){
+        
+//     }
+    
+	getPhotoURLBatch(photoIDs);
 }
 
 function getUserUploadedPictures(){
@@ -133,6 +196,38 @@ function getUserUploadedPictures(){
     {scope: 'user_photos'});
 }
 
+// function batchRequest(){
+//     $.ajax({
+//             url: 'https://graph.facebook.com',
+//             batch: {"method":"GET", "relative_url":"me"},
+//                     //{"method":"GET", "relative_url":"me/friends?limit=50"}]',
+//             success: function(json) {console.log(JSON.stringify(json))}
+//         });
+// }
+
+
+function batchRequest(){
+    // var opts = {
+    //               message : 'Some message',
+    //               name : 'Post Name',
+    //               link : 'url',
+    //               description : 'The post Description',
+    //               picture : 'url to image'
+    //           };
+    
+    FB.api('/', 'POST', {
+             batch: [
+                  { method: "GET", relative_url: "/me/photos?type=uploaded"}
+                  //{ method: "GET",relative_url: "me/friends?limit=50", body : $.param(opts) }
+                  //{ method: "GET",relative_url: "me/friends?limit=50"}
+             ]
+           }, function (response) {
+                    console.log(response);
+           });
+}
+       
+       
+
 //Only runs once DOM is ready
 $(document).ready(function(){
     
@@ -150,4 +245,9 @@ $(document).ready(function(){
 	$("#btnSendToSAPLeo").click(function(){
 	    sendToSAPLeo(jObject);
 	});
+	
+	$("#btnBatchRequest").click(function(){
+	    batchRequest();
+	});
+	
 });
