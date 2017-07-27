@@ -1,12 +1,9 @@
-// var oUrl;
-// var jURL = []; 
-//var photoURL;
-
 var userName;       //Stores the facebook user name to send together with the pictures in JSON
 var jObject = {};   //we send this JSON to SAP Leonardo (face recognition)
 var line;           //Controls HTML to display pictures in a line
 var phoroURLs = [];      //stores URLs for all photoIDs
 var photoIDs = [];       //stores IDs for all photoIDs
+var endpointAWS = "http://mlb1.eu-west-1.elasticbeanstalk.com/trainSystem"; //endpoint to train AWS selfie system
 
 window.fbAsyncInit = function() {
 //This function is required to initiate the Facebook SDK
@@ -77,6 +74,8 @@ function sendToSAPLeo(injObject){
 //This function is supposed to call the API which 
 //will recognize whose face is in picture
     console.log(JSON.stringify(injObject));
+    
+    //http://mlb1.eu-west-1.elasticbeanstalk.com/trainSystem
 }
 
 function getPhotoURL(photoID){
@@ -96,8 +95,8 @@ function getPhotoURL(photoID){
                         //photoURL = JSON.stringify(imgResult.source).replace(/['"]+/g, '');
                     //Clean URL to avoid special char at the begining and at the end of the string
                         //photoURL = photoURL.replace(/['"]+/g, '');
-                jObject.URL.push(JSON.stringify(imgResult.source).replace(/['"]+/g, ''));
-                jObject.Name = userName;
+                jObject.pics.push(JSON.stringify(imgResult.source).replace(/['"]+/g, ''));
+                jObject.user = userName;
             }
         }
     );
@@ -151,8 +150,8 @@ function getPhotoURLBatch(photoID){
             //photoURL = JSON.stringify(imgResult.source).replace(/['"]+/g, '');
             //Clean URL to avoid special char at the begining and at the end of the string
             //photoURL = photoURL.replace(/['"]+/g, '');
-            jObject.URL.push(JSON.stringify(eachElement.source).replace(/['"]+/g, ''));
-            jObject.Name = userName;
+            jObject.pics.push(JSON.stringify(eachElement.source).replace(/['"]+/g, ''));
+            jObject.user = userName;
         }
     });
 }
@@ -160,23 +159,15 @@ function getPhotoURLBatch(photoID){
 function displayUploadedPictures(result){
 // Function to display pictures user has uploaded or is tagged in HTML
 	var json;
-	jObject.URL = [];
+	jObject.pics = [];
 	
 	for(var i = 0; i < result.data.length ; i++){
-		
 		json = result.data[i];
-		line = "<tr>";
-		
  		var photoID = '/' + JSON.stringify(json.id)+ '?fields=source';
  		photoID = photoID.replace(/['"]+/g, '');
  		photoIDs.push(photoID);
- 	//	getPhotoURL(photoID);
 	}
 	
-// 	for (i=0; photoIDs.length, i++){
-        
-//     }
-    
 	getPhotoURLBatch(photoIDs);
 }
 
@@ -227,6 +218,61 @@ function batchRequest(){
 }
        
        
+       
+function sendPicsToAWS(endpoint, body){
+   $.ajax({
+      url: endpoint,
+      type: 'POST',
+      data: JSON.stringify(body),
+      dataType : "json",
+      contentType: "application/json",
+      success: function(data){
+          //return callback(data);
+          console.log(data);
+      }
+    //   error: function( xhr, status, errorThrown ) {
+    //     alert (errorThrown);
+    //     console.log( "Error: " + errorThrown );
+    //     console.log( "Status: " + status );
+    //     console.dir( xhr );
+    //   }
+  }); 
+}
+
+function profileAlbum(){
+    var profilePicsAlbumID;
+    
+    FB.api(
+        "/me/albums",
+        function (response) {
+          if (response && !response.error) {
+            /* handle the result */
+            console.dir(response);
+            for(var i = 0; i < response.data.length ; i++){
+                if (response.data[i].name === 'Profile Pictures'){
+                    profilePicsAlbumID = response.data[i].id;
+                    FB.api(
+                        "/"+ profilePicsAlbumID + "/photos",
+                        function (response) {
+                          if (response && !response.error) {
+                            /* handle the result */
+                            console.dir(response);
+                            displayUploadedPictures(response);
+                            
+                            // for(var i = 0; i < response.length ; i++){
+                            //     if (response.data[i].name === "Profile Pictures"){
+                            //         profilePicsAlbumID = response.data[i].ID;
+                            //     }
+                            // }
+                          }
+                        }
+                    );
+                }
+            }
+          }
+        }
+    );
+}
 
 //Only runs once DOM is ready
 $(document).ready(function(){
@@ -242,12 +288,13 @@ $(document).ready(function(){
 	});
 	
 	//When button "send pics to SAP Leonardo" is pressed
-	$("#btnSendToSAPLeo").click(function(){
-	    sendToSAPLeo(jObject);
+	$("#btnSendToAWS").click(function(){
+	    //sendToSAPLeo(jObject);
+	    sendPicsToAWS(endpointAWS, jObject);
 	});
 	
-	$("#btnBatchRequest").click(function(){
-	    batchRequest();
+	$("#btnProfileAlbum").click(function(){
+	    profileAlbum();
 	});
 	
 });
